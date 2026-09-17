@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from app.config import settings
-from app.routers import history, scans
+from app.routers import scans
 
 # Configure logging
 logging.basicConfig(
@@ -41,7 +41,6 @@ app.add_middleware(
 
 # Register routers
 app.include_router(scans.router)
-app.include_router(history.router)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="app/static"), name="static")

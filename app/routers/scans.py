@@ -75,12 +75,11 @@ async def submit_scan(
             400, f"Invalid source_type: {source_type}. Must be one of: git_url, zip_upload, local_path"
         )
 
-    # Read upload bytes if ZIP
     upload_bytes: Optional[bytes] = None
     if src_type == SourceType.ZIP_UPLOAD and file:
         upload_bytes = await file.read()
 
-    scan_id = str(uuid.uuid4())[:12]
+    scan_id = str(uuid.uuid4())
     scan_result = ScanResult(
         scan_id=scan_id,
         user_id=user_id,
@@ -105,7 +104,7 @@ async def submit_scan_json(
     user_id: str = Depends(get_current_user),
 ):
     """Submit a new scan via JSON body."""
-    scan_id = str(uuid.uuid4())[:12]
+    scan_id = str(uuid.uuid4())
     scan_result = ScanResult(
         scan_id=scan_id,
         user_id=user_id,
@@ -248,16 +247,7 @@ async def _execute_scan(
     repo_path = None
     
     # Pre-create history record in Supabase so it shows up as Queued
-    try:
-        supabase = get_supabase()
-        supabase.table("scan_history").insert({
-            "id": scan_id,
-            "user_id": user_id,
-            "git_url": source_value,
-            "status": ScanStatus.QUEUED.value
-        }).execute()
-    except Exception as exc:
-        logger.error("Failed to insert initial scan record: %s", exc)
+    pass
 
     try:
         # Phase 1: Prepare repo
@@ -286,9 +276,6 @@ async def _execute_scan(
         scan.completed_at = datetime.now(timezone.utc)
         scan.phase_message = f"Scan complete — {len(scan.findings)} findings"
 
-        # Save to history
-        _save_to_history(scan)
-
         logger.info("Scan %s complete: %d findings", scan_id, len(scan.findings))
 
     except RepoHandlerError as exc:
@@ -307,34 +294,6 @@ async def _execute_scan(
         # Always clean up temp files
         if repo_path and source_type != SourceType.LOCAL_PATH:
             cleanup_repo(repo_path)
-            
-        # Update Supabase status (even on failure)
-        try:
-            supabase = get_supabase()
-            supabase.table("scan_history").update({
-                "status": scan.status.value
-            }).eq("id", scan_id).execute()
-        except Exception:
-            pass
 
 
-def _save_to_history(scan: ScanResult) -> None:
-    """Append scan result to Supabase."""
-    try:
-        supabase = get_supabase()
-        
-        # Update scan_history
-        supabase.table("scan_history").update({
-            "status": scan.status.value,
-            "completed_at": scan.completed_at.isoformat() if scan.completed_at else None,
-            "summary": scan.summary.model_dump(mode="json") if scan.summary else None
-        }).eq("id", scan.scan_id).execute()
-        
-        # Insert findings into scan_reports
-        supabase.table("scan_reports").insert({
-            "scan_id": scan.scan_id,
-            "findings": [f.model_dump(mode="json") for f in scan.findings]
-        }).execute()
-        
-    except Exception as exc:
-        logger.warning("Failed to save history to Supabase: %s", exc)
+
