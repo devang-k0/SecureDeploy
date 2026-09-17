@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureDeploy — Security Scanner</title>
+    <meta name="description" content="Scan code repositories for security vulnerabilities, risky dependencies, and hardcoded secrets with SecureDeploy.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- Ambient background glow -->
+    <div class="ambient-glow ambient-glow--1"></div>
+    <div class="ambient-glow ambient-glow--2"></div>
+
+    <!-- Header -->
+    <header class="header" id="header">
+        <div class="header__brand">
+            <div class="header__logo">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                    <rect width="32" height="32" rx="8" fill="url(#logo-grad)"/>
+                    <path d="M16 6L8 10v6c0 5.5 3.4 10.6 8 12 4.6-1.4 8-6.5 8-12v-6l-8-4z" fill="white" fill-opacity="0.9"/>
+                    <path d="M14 16l2 2 4-4" stroke="url(#check-grad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <defs>
+                        <linearGradient id="logo-grad" x1="0" y1="0" x2="32" y2="32">
+                            <stop stop-color="#7c3aed"/>
+                            <stop offset="1" stop-color="#06b6d4"/>
+                        </linearGradient>
+                        <linearGradient id="check-grad" x1="14" y1="14" x2="20" y2="18">
+                            <stop stop-color="#7c3aed"/>
+                            <stop offset="1" stop-color="#06b6d4"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+            </div>
+            <div>
+                <h1 class="header__title">SecureDeploy</h1>
+                <p class="header__subtitle">Code Security Scanner</p>
+            </div>
+        </div>
+        <nav class="header__nav" id="main-nav">
+            <button class="nav-btn active" data-tab="submit" id="nav-submit">
+                <span class="nav-btn__icon">⬆</span> New Scan
+            </button>
+            <button class="nav-btn" data-tab="progress" id="nav-progress" style="display:none;">
+                <span class="nav-btn__icon">⏳</span> Progress
+            </button>
+            <button class="nav-btn" data-tab="results" id="nav-results" style="display:none;">
+                <span class="nav-btn__icon">📊</span> Results
+            </button>
+            <button class="nav-btn" data-tab="history" id="nav-history">
+                <span class="nav-btn__icon">🕐</span> History
+            </button>
+        </nav>
+    </header>
+
+    <!-- Main content area -->
+    <main class="main">
+
+        <!-- TAB: Submit a Scan -->
+        <section class="tab-panel active" id="panel-submit">
+            <div class="panel-header">
+                <h2 class="panel-header__title">Start a Security Scan</h2>
+                <p class="panel-header__desc">Analyze a code repository for vulnerabilities, risky dependencies, and hardcoded secrets.</p>
+            </div>
+
+            <div class="source-tabs" id="source-tabs">
+                <button class="source-tab active" data-source="git_url" id="source-git">
+                    <span class="source-tab__icon">🌐</span>
+                    <span>Git URL</span>
+                </button>
+                <button class="source-tab" data-source="zip_upload" id="source-zip">
+                    <span class="source-tab__icon">📦</span>
+                    <span>Upload ZIP</span>
+                </button>
+                <button class="source-tab" data-source="local_path" id="source-local">
+                    <span class="source-tab__icon">📁</span>
+                    <span>Local Path</span>
+                </button>
+            </div>
+
+            <!-- Git URL input -->
+            <div class="input-area" id="input-git_url">
+                <label class="input-label" for="git-url-input">Public Repository URL</label>
+                <div class="input-row">
+                    <input type="url" id="git-url-input" class="text-input" placeholder="https://github.com/owner/repo.git" autocomplete="off">
+                </div>
+                <p class="input-hint">Supports GitHub, GitLab, Bitbucket, and any public Git URL.</p>
+            </div>
+
+            <!-- ZIP upload -->
+            <div class="input-area hidden" id="input-zip_upload">
+                <label class="input-label">Upload ZIP Archive</label>
+                <div class="drop-zone" id="drop-zone">
+                    <div class="drop-zone__content">
+                        <span class="drop-zone__icon">📁</span>
+                        <p class="drop-zone__text">Drag & drop a ZIP file here</p>
+                        <p class="drop-zone__hint">or click to browse</p>
+                    </div>
+                    <input type="file" id="zip-file-input" accept=".zip" class="drop-zone__input">
+                </div>
+                <p class="file-name" id="selected-file-name"></p>
+            </div>
+
+            <!-- Local path -->
+            <div class="input-area hidden" id="input-local_path">
+                <label class="input-label" for="local-path-input">Local Directory Path</label>
+                <div class="input-row">
+                    <input type="text" id="local-path-input" class="text-input" placeholder="/path/to/your/project" autocomplete="off">
+                </div>
+                <p class="input-hint">Path must be accessible from the server. Only works when running locally.</p>
+            </div>
+
+            <button class="btn btn--primary btn--lg" id="start-scan-btn">
+                <span class="btn__icon">🛡️</span>
+                Start Security Scan
+            </button>
+
+            <div class="error-banner hidden" id="submit-error"></div>
+
+            <!-- Scanner info cards -->
+            <div class="scanner-cards">
+                <div class="scanner-card">
+                    <div class="scanner-card__icon">🔍</div>
+                    <h3 class="scanner-card__title">Code Patterns</h3>
+                    <p class="scanner-card__desc">Semgrep & Bandit scan for SQL injection, XSS, insecure crypto, and more.</p>
+                </div>
+                <div class="scanner-card">
+                    <div class="scanner-card__icon">📦</div>
+                    <h3 class="scanner-card__title">Dependencies</h3>
+                    <p class="scanner-card__desc">pip-audit checks for known vulnerabilities in your Python packages.</p>
+                </div>
+                <div class="scanner-card">
+                    <div class="scanner-card__icon">🔑</div>
+                    <h3 class="scanner-card__title">Secrets</h3>
+                    <p class="scanner-card__desc">Gitleaks detects hardcoded API keys, passwords, and tokens.</p>
+                </div>
+                <div class="scanner-card">
+                    <div class="scanner-card__icon">🤖</div>
+                    <h3 class="scanner-card__title">AI Triage</h3>
+                    <p class="scanner-card__desc">Optional Ollama-powered analysis prioritizes findings in plain language.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB: Progress -->
+        <section class="tab-panel" id="panel-progress">
+            <div class="panel-header">
+                <h2 class="panel-header__title">Scan in Progress</h2>
+                <p class="panel-header__desc" id="progress-scan-id"></p>
+            </div>
+
+            <div class="progress-container">
+                <div class="progress-ring" id="progress-ring">
+                    <svg viewBox="0 0 120 120">
+                        <circle class="progress-ring__bg" cx="60" cy="60" r="52"/>
+                        <circle class="progress-ring__fill" cx="60" cy="60" r="52" id="progress-circle"/>
+                    </svg>
+                    <div class="progress-ring__label" id="progress-percent">0%</div>
+                </div>
+
+                <div class="progress-phases" id="progress-phases">
+                    <div class="phase" data-phase="queued">
+                        <div class="phase__dot"></div>
+                        <span class="phase__label">Queued</span>
+                    </div>
+                    <div class="phase" data-phase="cloning">
+                        <div class="phase__dot"></div>
+                        <span class="phase__label">Preparing Repository</span>
+                    </div>
+                    <div class="phase" data-phase="scanning">
+                        <div class="phase__dot"></div>
+                        <span class="phase__label">Running Scanners</span>
+                    </div>
+                    <div class="phase" data-phase="analyzing">
+                        <div class="phase__dot"></div>
+                        <span class="phase__label">AI Analysis</span>
+                    </div>
+                    <div class="phase" data-phase="complete">
+                        <div class="phase__dot"></div>
+                        <span class="phase__label">Complete</span>
+                    </div>
+                </div>
+
+                <p class="progress-message" id="progress-message">Initializing...</p>
+            </div>
+        </section>
+
+        <!-- TAB: Results -->
+        <section class="tab-panel" id="panel-results">
+            <div class="panel-header">
+                <h2 class="panel-header__title">Scan Results</h2>
+                <p class="panel-header__desc" id="results-scan-info"></p>
+            </div>
+
+            <!-- Summary cards -->
+            <div class="summary-grid" id="summary-grid">
+                <div class="summary-card summary-card--total">
+                    <div class="summary-card__value" id="summary-total">0</div>
+                    <div class="summary-card__label">Total Findings</div>
+                </div>
+                <div class="summary-card summary-card--critical">
+                    <div class="summary-card__value" id="summary-critical">0</div>
+                    <div class="summary-card__label">Critical</div>
+                </div>
+                <div class="summary-card summary-card--high">
+                    <div class="summary-card__value" id="summary-high">0</div>
+                    <div class="summary-card__label">High</div>
+                </div>
+                <div class="summary-card summary-card--medium">
+                    <div class="summary-card__value" id="summary-medium">0</div>
+                    <div class="summary-card__label">Medium</div>
+                </div>
+                <div class="summary-card summary-card--low">
+                    <div class="summary-card__value" id="summary-low">0</div>
+                    <div class="summary-card__label">Low</div>
+                </div>
+            </div>
+
+            <!-- Download buttons -->
+            <div class="download-bar" id="download-bar">
+                <button class="btn btn--outline" id="download-md-btn">
+                    <span class="btn__icon">📄</span> Download Markdown
+                </button>
+                <button class="btn btn--outline" id="download-json-btn">
+                    <span class="btn__icon">📋</span> Download JSON
+                </button>
+                <button class="btn btn--ghost" id="new-scan-btn">
+                    <span class="btn__icon">➕</span> New Scan
+                </button>
+            </div>
+
+            <!-- AI Analysis section -->
+            <div class="ai-analysis hidden" id="ai-analysis-section">
+                <div class="ai-analysis__header">
+                    <span class="ai-analysis__icon">🤖</span>
+                    <h3>AI Analysis</h3>
+                </div>
+                <div class="ai-analysis__content" id="ai-analysis-content"></div>
+            </div>
+
+            <!-- Findings filter -->
+            <div class="filter-bar" id="filter-bar">
+                <button class="filter-btn active" data-filter="all" id="filter-all">All</button>
+                <button class="filter-btn" data-filter="critical" id="filter-critical">Critical</button>
+                <button class="filter-btn" data-filter="high" id="filter-high">High</button>
+                <button class="filter-btn" data-filter="medium" id="filter-medium">Medium</button>
+                <button class="filter-btn" data-filter="low" id="filter-low">Low</button>
+                <button class="filter-btn" data-filter="code_pattern" id="filter-code">Code</button>
+                <button class="filter-btn" data-filter="dependency" id="filter-dep">Deps</button>
+                <button class="filter-btn" data-filter="secret" id="filter-secret">Secrets</button>
+            </div>
+
+            <!-- Findings list -->
+            <div class="findings-list" id="findings-list">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- No results state -->
+            <div class="empty-state hidden" id="no-findings">
+                <div class="empty-state__icon">✅</div>
+                <h3 class="empty-state__title">No Security Issues Found</h3>
+                <p class="empty-state__desc">Great job! Your code passed all security checks.</p>
+            </div>
+        </section>
+
+        <!-- TAB: History -->
+        <section class="tab-panel" id="panel-history">
+            <div class="panel-header">
+                <h2 class="panel-header__title">Scan History</h2>
+                <p class="panel-header__desc">Recent security scans</p>
+            </div>
+
+            <div class="history-list" id="history-list">
+                <!-- Dynamically populated -->
+            </div>
+
+            <div class="empty-state hidden" id="no-history">
+                <div class="empty-state__icon">📭</div>
+                <h3 class="empty-state__title">No Scans Yet</h3>
+                <p class="empty-state__desc">Start your first scan to see history here.</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>SecureDeploy v1.0 — Open-source security scanning</p>
+    </footer>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
