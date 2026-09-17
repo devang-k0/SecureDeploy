@@ -159,49 +159,81 @@ def _enrich_finding(finding: Finding):
     if finding.category == Category.SECRET:
         finding.attack_type = "Credential Exposure"
         finding.risk_explanation = "Allows attackers to impersonate users, access private repositories, or breach databases."
+        if finding.cvss_score is None:
+            finding.cvss_score = 9.8
         return
 
     # A simple mapping of CWE to Attack Type and Risk
     cwe_map = {
-        "CWE-79": ("Cross-Site Scripting (XSS)", "Attackers can execute arbitrary JavaScript in victims' browsers, stealing sessions."),
-        "CWE-89": ("SQL Injection", "Attackers can bypass authentication or execute arbitrary database queries, leading to data loss/breach."),
-        "CWE-22": ("Path Traversal", "Attackers can read sensitive files (like /etc/passwd) on the server."),
-        "CWE-78": ("OS Command Injection", "Attackers can execute arbitrary shell commands on the server host."),
-        "CWE-312": ("Cleartext Storage of Sensitive Information", "Exposes credentials or PII if the storage medium is compromised."),
-        "CWE-327": ("Broken or Risky Cryptographic Algorithm", "Weak crypto can be cracked, exposing data in transit or at rest."),
-        "CWE-918": ("Server-Side Request Forgery (SSRF)", "Attackers can make requests on behalf of the server, accessing internal networks."),
-        "CWE-94": ("Code Injection", "Allows arbitrary code execution on the server."),
-        "CWE-502": ("Insecure Deserialization", "Can lead to remote code execution when un-pickling or deserializing untrusted data."),
-        "CWE-352": ("Cross-Site Request Forgery (CSRF)", "Attackers can perform actions on behalf of an authenticated user."),
+        "CWE-79": ("Cross-Site Scripting (XSS)", "Attackers can execute arbitrary JavaScript in victims' browsers, stealing sessions.", 6.1),
+        "CWE-89": ("SQL Injection", "Attackers can bypass authentication or execute arbitrary database queries, leading to data loss/breach.", 9.8),
+        "CWE-22": ("Path Traversal", "Attackers can read sensitive files (like /etc/passwd) on the server.", 7.5),
+        "CWE-78": ("OS Command Injection", "Attackers can execute arbitrary shell commands on the server host.", 9.8),
+        "CWE-312": ("Cleartext Storage of Sensitive Information", "Exposes credentials or PII if the storage medium is compromised.", 7.5),
+        "CWE-327": ("Broken or Risky Cryptographic Algorithm", "Weak crypto can be cracked, exposing data in transit or at rest.", 5.9),
+        "CWE-918": ("Server-Side Request Forgery (SSRF)", "Attackers can make requests on behalf of the server, accessing internal networks.", 8.8),
+        "CWE-94": ("Code Injection", "Allows arbitrary code execution on the server.", 9.8),
+        "CWE-502": ("Insecure Deserialization", "Can lead to remote code execution when un-pickling or deserializing untrusted data.", 9.8),
+        "CWE-352": ("Cross-Site Request Forgery (CSRF)", "Attackers can perform actions on behalf of an authenticated user.", 6.5),
     }
 
     # Common rule mapping as fallback
     rule_map = {
-        "B101": ("Improper Validation", "Using assert for validation can be bypassed if Python is run in optimized mode (-O)."),
-        "B102": ("Code Injection", "exec() allows arbitrary python code execution."),
-        "B104": ("Network Exposure", "Binding to all interfaces (0.0.0.0) may expose internal services to the public internet."),
-        "B108": ("Insecure Temp File", "Using hardcoded /tmp paths can lead to symlink attacks or data exposure."),
-        "B501": ("Man-in-the-Middle (MitM)", "Disabling SSL verification allows attackers to intercept or modify traffic."),
-        "B608": ("SQL Injection", "String formatting in SQL queries allows attackers to execute arbitrary queries."),
+        "B101": ("Improper Validation", "Using assert for validation can be bypassed if Python is run in optimized mode (-O).", 3.1),
+        "B102": ("Code Injection", "exec() allows arbitrary python code execution.", 9.8),
+        "B104": ("Network Exposure", "Binding to all interfaces (0.0.0.0) may expose internal services to the public internet.", 6.5),
+        "B108": ("Insecure Temp File", "Using hardcoded /tmp paths can lead to symlink attacks or data exposure.", 5.5),
+        "B501": ("Man-in-the-Middle (MitM)", "Disabling SSL verification allows attackers to intercept or modify traffic.", 7.5),
+        "B608": ("SQL Injection", "String formatting in SQL queries allows attackers to execute arbitrary queries.", 9.8),
     }
 
+    assigned_cvss = None
+
     if finding.cwe and finding.cwe in cwe_map:
-        attack, risk = cwe_map[finding.cwe]
+        attack, risk, cvss = cwe_map[finding.cwe]
         if not finding.attack_type:
             finding.attack_type = attack
         if not finding.risk_explanation:
             finding.risk_explanation = risk
+        assigned_cvss = cvss
     elif finding.rule_id and finding.rule_id in rule_map:
-        attack, risk = rule_map[finding.rule_id]
+        attack, risk, cvss = rule_map[finding.rule_id]
         if not finding.attack_type:
             finding.attack_type = attack
         if not finding.risk_explanation:
             finding.risk_explanation = risk
+        assigned_cvss = cvss
     else:
         if not finding.attack_type:
             finding.attack_type = "Security Misconfiguration"
         if not finding.risk_explanation:
             finding.risk_explanation = "Violates secure coding best practices, potentially allowing unauthorized access or unstable behavior."
+            
+    # Fallback CVSS if not mapped
+    if finding.cvss_score is None:
+        if assigned_cvss is not None:
+            finding.cvss_score = assigned_cvss
+        else:
+            base_scores = {
+                Severity.CRITICAL: 9.5,
+                Severity.HIGH: 8.0,
+                Severity.MEDIUM: 5.5,
+                Severity.LOW: 2.5,
+                Severity.INFO: 0.0,
+            }
+            finding.cvss_score = base_scores.get(finding.severity, 0.0)
+
+    # Re-evaluate Severity based on strict CVSS v4.0 bands
+    if finding.cvss_score >= 9.0:
+        finding.severity = Severity.CRITICAL
+    elif finding.cvss_score >= 7.0:
+        finding.severity = Severity.HIGH
+    elif finding.cvss_score >= 4.0:
+        finding.severity = Severity.MEDIUM
+    elif finding.cvss_score >= 0.1:
+        finding.severity = Severity.LOW
+    else:
+        finding.severity = Severity.INFO
 
 
 
@@ -214,14 +246,39 @@ def _build_summary(findings: list[Finding], scanners_used: list[str]) -> ScanSum
     file_counts = Counter(f.file_path for f in findings if f.file_path)
     top_files = [fp for fp, _ in file_counts.most_common(10)]
 
+    # Re-calculate severity counts since they might have changed due to CVSS alignment
+    c_count = sum(1 for f in findings if f.severity == Severity.CRITICAL)
+    h_count = sum(1 for f in findings if f.severity == Severity.HIGH)
+    m_count = sum(1 for f in findings if f.severity == Severity.MEDIUM)
+    l_count = sum(1 for f in findings if f.severity == Severity.LOW)
+    i_count = sum(1 for f in findings if f.severity == Severity.INFO)
+
+    # Calculate Project CVSS (Max of all findings)
+    project_cvss = 0.0
+    if findings:
+        project_cvss = max((f.cvss_score or 0.0) for f in findings)
+
+    if project_cvss >= 9.0:
+        label = "Critical"
+    elif project_cvss >= 7.0:
+        label = "High"
+    elif project_cvss >= 4.0:
+        label = "Medium"
+    elif project_cvss >= 0.1:
+        label = "Low"
+    else:
+        label = "None"
+
     return ScanSummary(
         total_findings=len(findings),
-        critical=sev_counts.get(Severity.CRITICAL, 0),
-        high=sev_counts.get(Severity.HIGH, 0),
-        medium=sev_counts.get(Severity.MEDIUM, 0),
-        low=sev_counts.get(Severity.LOW, 0),
-        info=sev_counts.get(Severity.INFO, 0),
+        critical=c_count,
+        high=h_count,
+        medium=m_count,
+        low=l_count,
+        info=i_count,
         by_category=dict(cat_counts),
         scanners_used=scanners_used,
         top_files=top_files,
+        project_cvss=project_cvss,
+        score_label=label,
     )

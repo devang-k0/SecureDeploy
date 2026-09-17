@@ -62,6 +62,7 @@ class Finding(BaseModel):
     )
     rule_id: Optional[str] = None
     cwe: Optional[str] = None
+    cvss_score: Optional[float] = Field(None, description="CVSS v4.0 score (0.0 - 10.0)")
     attack_type: Optional[str] = Field(None, description="Human-readable attack category (e.g., SQL Injection)")
     risk_explanation: Optional[str] = Field(None, description="Why this is a risk in plain language")
     fix_suggestion: Optional[str] = None
@@ -89,6 +90,8 @@ class ScanSummary(BaseModel):
     by_category: dict[str, int] = Field(default_factory=dict)
     scanners_used: list[str] = Field(default_factory=list)
     top_files: list[str] = Field(default_factory=list)
+    project_cvss: float = Field(0.0, description="Overall project CVSS score (max of all findings)")
+    score_label: str = Field("None", description="Qualitative label for project CVSS")
 
 
 class ScanResult(BaseModel):

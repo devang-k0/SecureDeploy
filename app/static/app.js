@@ -301,6 +301,19 @@
             $('#summary-high').textContent = s.high || 0;
             $('#summary-medium').textContent = s.medium || 0;
             $('#summary-low').textContent = s.low || 0;
+            
+            if (s.project_cvss !== undefined) {
+                $('#project-score-container').style.display = 'flex';
+                $('#project-score-value').textContent = s.project_cvss.toFixed(1);
+                $('#project-score-label').textContent = s.score_label;
+                
+                const scoreValue = $('#project-score-value');
+                scoreValue.className = 'project-score__value';
+                if (s.project_cvss >= 9.0) scoreValue.classList.add('score-critical-risk');
+                else if (s.project_cvss >= 7.0) scoreValue.classList.add('score-high-risk');
+                else if (s.project_cvss >= 4.0) scoreValue.classList.add('score-needs-attention');
+                else scoreValue.classList.add('score-excellent');
+            }
 
             // Animate counter values
             animateCounters();
@@ -358,6 +371,7 @@
                     </div>
                     <div class="finding-card__badges">
                         <span class="sev-badge sev-badge--${f.severity}">${f.severity}</span>
+                        ${f.cvss_score !== null && f.cvss_score !== undefined ? `<span class="cvss-badge">CVSS ${f.cvss_score.toFixed(1)}</span>` : ''}
                         <span class="cat-badge">${catLabel}</span>
                         ${f.attack_type ? `<span class="attack-badge">🛡️ ${escapeHtml(f.attack_type)}</span>` : ''}
                         <span class="finding-card__chevron">▼</span>

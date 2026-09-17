@@ -1247,3 +1247,55 @@ body {
     color: var(--text-secondary);
     line-height: 1.5;
 }
+
+/* --- Project Score UI --- */
+.panel-header--results {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.project-score-container {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--bg-surface);
+    padding: 12px 24px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-medium);
+}
+
+.project-score__value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.project-score__value.score-excellent { color: #4caf50; }
+.project-score__value.score-needs-attention { color: #ffeb3b; }
+.project-score__value.score-high-risk { color: #ff9800; }
+.project-score__value.score-critical-risk { color: #f44336; }
+
+.project-score__title {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    margin-bottom: 2px;
+}
+
+.project-score__label {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.cvss-badge {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}

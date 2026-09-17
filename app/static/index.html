@@ -190,9 +190,18 @@
 
         <!-- TAB: Results -->
         <section class="tab-panel" id="panel-results">
-            <div class="panel-header">
-                <h2 class="panel-header__title">Scan Results</h2>
-                <p class="panel-header__desc" id="results-scan-info"></p>
+            <div class="panel-header panel-header--results">
+                <div>
+                    <h2 class="panel-header__title">Scan Results</h2>
+                    <p class="panel-header__desc" id="results-scan-info"></p>
+                </div>
+                <div class="project-score-container" id="project-score-container" style="display: none;">
+                    <div class="project-score__value" id="project-score-value">0.0</div>
+                    <div class="project-score__meta">
+                        <div class="project-score__title">Project CVSS Score</div>
+                        <div class="project-score__label" id="project-score-label">None</div>
+                    </div>
+                </div>
             </div>
 
             <!-- Summary cards -->
