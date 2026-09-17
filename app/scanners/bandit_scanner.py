@@ -86,8 +86,8 @@ class BanditScanner(BaseScanner):
                     cwe=cwe,
                     fix_suggestion=_bandit_fix(r.get("test_id", "")),
                     reference_urls=[
-                        f"https://bandit.readthedocs.io/en/latest/plugins/{r.get('test_id', '').lower()}.html"
-                    ],
+                        f"https://cwe.mitre.org/data/definitions/{cwe_data['id']}.html"
+                    ] if isinstance(cwe_data, dict) and cwe_data.get("id") else [],
                 )
             )
 

@@ -62,6 +62,8 @@ class Finding(BaseModel):
     )
     rule_id: Optional[str] = None
     cwe: Optional[str] = None
+    attack_type: Optional[str] = Field(None, description="Human-readable attack category (e.g., SQL Injection)")
+    risk_explanation: Optional[str] = Field(None, description="Why this is a risk in plain language")
     fix_suggestion: Optional[str] = None
     reference_urls: list[str] = Field(default_factory=list)
 

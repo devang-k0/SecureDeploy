@@ -68,6 +68,7 @@ class SemgrepScanner(BaseScanner):
             refs = metadata.get("references", [])
             if isinstance(refs, str):
                 refs = [refs]
+            refs = [r for r in refs if isinstance(r, str) and (r.startswith("http://") or r.startswith("https://"))]
 
             sev_str = extra.get("severity", "INFO").upper()
             severity = _SEVERITY_MAP.get(sev_str, Severity.MEDIUM)

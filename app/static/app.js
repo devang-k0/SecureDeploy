@@ -352,7 +352,6 @@
                     <div class="finding-card__main">
                         <div class="finding-card__title">${escapeHtml(f.title)}</div>
                         <div class="finding-card__meta">
-                            ${f.file_path ? `<span>📄 ${escapeHtml(f.file_path)}${f.line_start ? `:${f.line_start}` : ''}</span>` : ''}
                             <span>🔧 ${escapeHtml(f.scanner)}</span>
                             ${f.cwe ? `<span>${escapeHtml(f.cwe)}</span>` : ''}
                         </div>
@@ -360,11 +359,23 @@
                     <div class="finding-card__badges">
                         <span class="sev-badge sev-badge--${f.severity}">${f.severity}</span>
                         <span class="cat-badge">${catLabel}</span>
+                        ${f.attack_type ? `<span class="attack-badge">🛡️ ${escapeHtml(f.attack_type)}</span>` : ''}
                         <span class="finding-card__chevron">▼</span>
                     </div>
                 </div>
                 <div class="finding-card__body">
+                    ${f.file_path ? `
+                    <div class="finding-card__location">
+                        <strong>📍 Location:</strong> <code>${escapeHtml(f.file_path)}${f.line_start ? ` : line ${f.line_start}` : ''}</code>
+                    </div>
+                    ` : ''}
                     <p class="finding-card__desc">${escapeHtml(f.description)}</p>
+                    ${f.risk_explanation ? `
+                    <div class="finding-card__risk">
+                        <strong>⚠️ Why is this a risk?</strong>
+                        <p>${escapeHtml(f.risk_explanation)}</p>
+                    </div>
+                    ` : ''}
                     ${f.code_snippet ? `<pre class="finding-card__code">${escapeHtml(f.code_snippet)}</pre>` : ''}
                     ${f.fix_suggestion ? `
                         <div class="finding-card__fix">
