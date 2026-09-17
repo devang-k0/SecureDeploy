@@ -15,6 +15,24 @@
     let currentSourceType = 'git_url';
     let currentFilter = 'all';
     let allFindings = [];
+    
+    // Auth State
+    let supa = null;
+    let currentSession = null;
+
+    // Intercept fetch to add Auth header
+    const originalFetch = window.fetch;
+    window.fetch = async (...args) => {
+        let [resource, config] = args;
+        if (currentSession && currentSession.access_token && resource.startsWith('/api/')) {
+            config = config || {};
+            config.headers = {
+                ...config.headers,
+                'Authorization': `Bearer ${currentSession.access_token}`
+            };
+        }
+        return await originalFetch(resource, config);
+    };
 
     // ========================================================================
     // DOM References
@@ -57,10 +75,75 @@
     }
 
     $$('.nav-btn').forEach((btn) => {
+        if (btn.id === 'btn-logout') return; // Handled separately
         btn.addEventListener('click', () => {
-            const tab = btn.dataset.tab;
-            if (tab) switchTab(tab);
+            if (btn.dataset.tab) {
+                switchTab(btn.dataset.tab);
+            }
         });
+    });
+
+    // ========================================================================
+    // Authentication
+    // ========================================================================
+    
+    async function initAuth() {
+        try {
+            const res = await originalFetch('/api/config');
+            if (!res.ok) throw new Error('Failed to load config');
+            const config = await res.json();
+            
+            if (!config.supabase_url || !config.supabase_anon_key) {
+                console.warn('Supabase not configured on backend.');
+                const overlay = $('#auth-overlay');
+                overlay.querySelector('h2').textContent = 'Configuration Error';
+                overlay.querySelector('p').textContent = 'Please set SUPABASE_URL and SUPABASE_ANON_KEY in your .env file and restart the backend.';
+                $('#btn-login-google').style.display = 'none';
+                return;
+            }
+            
+            supa = window.supabase.createClient(config.supabase_url, config.supabase_anon_key);
+            
+            // Get initial session
+            const { data, error } = await supa.auth.getSession();
+            currentSession = data.session;
+            
+            supa.auth.onAuthStateChange((event, session) => {
+                currentSession = session;
+                if (session) {
+                    $('#auth-overlay').classList.add('hidden');
+                    $('#btn-logout').style.display = 'flex';
+                } else {
+                    $('#auth-overlay').classList.remove('hidden');
+                    $('#btn-logout').style.display = 'none';
+                }
+            });
+            
+            if (currentSession) {
+                $('#auth-overlay').classList.add('hidden');
+                $('#btn-logout').style.display = 'flex';
+            }
+            
+        } catch (err) {
+            console.error('Error initializing auth:', err);
+        }
+    }
+
+    $('#btn-login-google').addEventListener('click', async () => {
+        if (!supa) return;
+        await supa.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: window.location.origin
+            }
+        });
+    });
+
+    $('#btn-logout').addEventListener('click', async () => {
+        if (supa) {
+            await supa.auth.signOut();
+            window.location.reload();
+        }
     });
 
     // ========================================================================
@@ -530,6 +613,8 @@
     // ========================================================================
     // Init
     // ========================================================================
-    loadHistory();
+    initAuth().then(() => {
+        switchTab('submit');
+    });
 
 })();

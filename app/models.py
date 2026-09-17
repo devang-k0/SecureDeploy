@@ -96,6 +96,7 @@ class ScanSummary(BaseModel):
 
 class ScanResult(BaseModel):
     scan_id: str
+    user_id: Optional[str] = None
     status: ScanStatus = ScanStatus.QUEUED
     source_type: SourceType
     source_value: str

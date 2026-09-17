@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile, Depends
 from fastapi.responses import PlainTextResponse, Response
 
 from app.config import settings
@@ -22,6 +22,8 @@ from app.models import (
     ScanStatus,
     SourceType,
 )
+from app.auth import get_current_user
+from app.database import get_supabase
 from app.scanners.runner import run_all_scanners
 from app.services.ollama_service import analyze_findings
 from app.services.repo_handler import RepoHandlerError, cleanup_repo, prepare_repo
@@ -50,6 +52,7 @@ async def submit_scan(
     source_value: str = Form(None),
     file: Optional[UploadFile] = File(None),
     json_body: Optional[str] = Form(None),
+    user_id: str = Depends(get_current_user),
 ):
     """Submit a new security scan."""
     # Handle JSON body submission (from fetch with JSON content-type)
@@ -80,6 +83,7 @@ async def submit_scan(
     scan_id = str(uuid.uuid4())[:12]
     scan_result = ScanResult(
         scan_id=scan_id,
+        user_id=user_id,
         status=ScanStatus.QUEUED,
         source_type=src_type,
         source_value=source_value,
@@ -89,7 +93,7 @@ async def submit_scan(
     _scans[scan_id] = scan_result
 
     # Launch scan in background
-    background_tasks.add_task(_execute_scan, scan_id, src_type, source_value, upload_bytes)
+    background_tasks.add_task(_execute_scan, scan_id, src_type, source_value, upload_bytes, user_id)
 
     return {"scan_id": scan_id, "status": scan_result.status.value}
 
@@ -98,11 +102,13 @@ async def submit_scan(
 async def submit_scan_json(
     background_tasks: BackgroundTasks,
     request: ScanRequest,
+    user_id: str = Depends(get_current_user),
 ):
     """Submit a new scan via JSON body."""
     scan_id = str(uuid.uuid4())[:12]
     scan_result = ScanResult(
         scan_id=scan_id,
+        user_id=user_id,
         status=ScanStatus.QUEUED,
         source_type=request.source_type,
         source_value=request.source_value,
@@ -112,10 +118,53 @@ async def submit_scan_json(
     _scans[scan_id] = scan_result
 
     background_tasks.add_task(
-        _execute_scan, scan_id, request.source_type, request.source_value, None
+        _execute_scan, scan_id, request.source_type, request.source_value, None, user_id
     )
 
     return {"scan_id": scan_id, "status": scan_result.status.value}
+
+
+def _get_authorized_scan(scan_id: str, user_id: str) -> ScanResult:
+    """Helper to fetch a scan from memory or Supabase, ensuring user_id matches."""
+    # Check in-memory first (for currently running scans)
+    scan = _scans.get(scan_id)
+    if scan:
+        if scan.user_id != user_id:
+            raise HTTPException(403, "Access denied")
+        return scan
+
+    # Fetch from Supabase
+    try:
+        supabase = get_supabase()
+        res = supabase.table("scan_history").select("*").eq("id", scan_id).eq("user_id", user_id).execute()
+        if not res.data:
+            raise HTTPException(404, f"Scan {scan_id} not found")
+        
+        row = res.data[0]
+        # We need to construct a ScanResult.
+        # Check if reports exist
+        rep_res = supabase.table("scan_reports").select("findings").eq("scan_id", scan_id).execute()
+        findings_data = rep_res.data[0]["findings"] if rep_res.data else []
+        
+        # We parse the row back into a ScanResult model. 
+        # (This is a bit simplified; in reality, we map the DB fields)
+        return ScanResult(
+            scan_id=row["id"],
+            user_id=row["user_id"],
+            status=ScanStatus(row["status"]),
+            source_type=SourceType(row.get("git_url", "git_url").split("://")[0] if "://" in row.get("git_url", "") else SourceType.GIT_URL),
+            source_value=row["git_url"],
+            started_at=row["created_at"],
+            completed_at=row.get("completed_at"),
+            findings=findings_data,
+            summary=row.get("summary"),
+            phase_message="Loaded from history"
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Error fetching scan %s: %s", scan_id, exc)
+        raise HTTPException(404, f"Scan {scan_id} not found")
 
 
 # ---------------------------------------------------------------------------
@@ -123,11 +172,9 @@ async def submit_scan_json(
 # ---------------------------------------------------------------------------
 
 @router.get("/scan/{scan_id}/status")
-async def get_scan_status(scan_id: str):
+async def get_scan_status(scan_id: str, user_id: str = Depends(get_current_user)):
     """Get the current status of a scan."""
-    scan = _scans.get(scan_id)
-    if not scan:
-        raise HTTPException(404, f"Scan {scan_id} not found")
+    scan = _get_authorized_scan(scan_id, user_id)
 
     return {
         "scan_id": scan.scan_id,
@@ -143,12 +190,9 @@ async def get_scan_status(scan_id: str):
 # ---------------------------------------------------------------------------
 
 @router.get("/scan/{scan_id}/results")
-async def get_scan_results(scan_id: str):
+async def get_scan_results(scan_id: str, user_id: str = Depends(get_current_user)):
     """Get the full scan results."""
-    scan = _scans.get(scan_id)
-    if not scan:
-        raise HTTPException(404, f"Scan {scan_id} not found")
-
+    scan = _get_authorized_scan(scan_id, user_id)
     return scan.model_dump(mode="json")
 
 
@@ -157,11 +201,9 @@ async def get_scan_results(scan_id: str):
 # ---------------------------------------------------------------------------
 
 @router.get("/scan/{scan_id}/report/markdown")
-async def download_markdown(scan_id: str):
+async def download_markdown(scan_id: str, user_id: str = Depends(get_current_user)):
     """Download the scan report as Markdown."""
-    scan = _scans.get(scan_id)
-    if not scan:
-        raise HTTPException(404, f"Scan {scan_id} not found")
+    scan = _get_authorized_scan(scan_id, user_id)
 
     if scan.status != ScanStatus.COMPLETE:
         raise HTTPException(400, "Scan is not yet complete")
@@ -175,11 +217,9 @@ async def download_markdown(scan_id: str):
 
 
 @router.get("/scan/{scan_id}/report/json")
-async def download_json(scan_id: str):
+async def download_json(scan_id: str, user_id: str = Depends(get_current_user)):
     """Download the scan report as JSON."""
-    scan = _scans.get(scan_id)
-    if not scan:
-        raise HTTPException(404, f"Scan {scan_id} not found")
+    scan = _get_authorized_scan(scan_id, user_id)
 
     if scan.status != ScanStatus.COMPLETE:
         raise HTTPException(400, "Scan is not yet complete")
@@ -201,10 +241,23 @@ async def _execute_scan(
     source_type: SourceType,
     source_value: str,
     upload_bytes: Optional[bytes],
+    user_id: str,
 ) -> None:
     """Execute the full scan pipeline in the background."""
     scan = _scans[scan_id]
     repo_path = None
+    
+    # Pre-create history record in Supabase so it shows up as Queued
+    try:
+        supabase = get_supabase()
+        supabase.table("scan_history").insert({
+            "id": scan_id,
+            "user_id": user_id,
+            "git_url": source_value,
+            "status": ScanStatus.QUEUED.value
+        }).execute()
+    except Exception as exc:
+        logger.error("Failed to insert initial scan record: %s", exc)
 
     try:
         # Phase 1: Prepare repo
@@ -254,34 +307,34 @@ async def _execute_scan(
         # Always clean up temp files
         if repo_path and source_type != SourceType.LOCAL_PATH:
             cleanup_repo(repo_path)
+            
+        # Update Supabase status (even on failure)
+        try:
+            supabase = get_supabase()
+            supabase.table("scan_history").update({
+                "status": scan.status.value
+            }).eq("id", scan_id).execute()
+        except Exception:
+            pass
 
 
 def _save_to_history(scan: ScanResult) -> None:
-    """Append scan result to the history file."""
+    """Append scan result to Supabase."""
     try:
-        history: list[dict] = []
-        if os.path.isfile(settings.HISTORY_FILE):
-            with open(settings.HISTORY_FILE, "r", encoding="utf-8") as f:
-                history = json.load(f)
-
-        entry = HistoryEntry(
-            scan_id=scan.scan_id,
-            source_type=scan.source_type,
-            source_value=scan.source_value,
-            started_at=scan.started_at,
-            completed_at=scan.completed_at,
-            status=scan.status,
-            total_findings=len(scan.findings),
-            critical=scan.summary.critical if scan.summary else 0,
-            high=scan.summary.high if scan.summary else 0,
-        )
-        history.insert(0, entry.model_dump(mode="json"))
-
-        # Keep only recent entries
-        history = history[: settings.MAX_HISTORY_ENTRIES]
-
-        with open(settings.HISTORY_FILE, "w", encoding="utf-8") as f:
-            json.dump(history, f, indent=2, default=str)
-
+        supabase = get_supabase()
+        
+        # Update scan_history
+        supabase.table("scan_history").update({
+            "status": scan.status.value,
+            "completed_at": scan.completed_at.isoformat() if scan.completed_at else None,
+            "summary": scan.summary.model_dump(mode="json") if scan.summary else None
+        }).eq("id", scan.scan_id).execute()
+        
+        # Insert findings into scan_reports
+        supabase.table("scan_reports").insert({
+            "scan_id": scan.scan_id,
+            "findings": [f.model_dump(mode="json") for f in scan.findings]
+        }).execute()
+        
     except Exception as exc:
-        logger.warning("Failed to save history: %s", exc)
+        logger.warning("Failed to save history to Supabase: %s", exc)

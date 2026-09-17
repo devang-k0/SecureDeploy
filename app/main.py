@@ -58,6 +58,16 @@ async def health_check():
     """Health check endpoint."""
     return {"status": "ok", "version": "1.0.0"}
 
+import os
+
+@app.get("/api/config")
+async def get_config():
+    """Return public config for the frontend."""
+    return {
+        "supabase_url": os.environ.get("SUPABASE_URL"),
+        "supabase_anon_key": os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_KEY")
+    }
+
 
 @app.on_event("startup")
 async def startup_event():

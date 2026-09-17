@@ -8,25 +8,22 @@ import json
 import logging
 import os
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from app.config import settings
+from app.auth import get_current_user
+from app.database import get_supabase
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["history"])
 
 
 @router.get("/history")
-async def get_history():
-    """Return recent scan history."""
+async def get_history(user_id: str = Depends(get_current_user)):
+    """Return recent scan history for the authenticated user from Supabase."""
     try:
-        if not os.path.isfile(settings.HISTORY_FILE):
-            return {"history": []}
-
-        with open(settings.HISTORY_FILE, "r", encoding="utf-8") as f:
-            history = json.load(f)
-
-        return {"history": history}
+        supabase = get_supabase()
+        response = supabase.table("scan_history").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+        return {"history": response.data}
     except Exception as exc:
-        logger.warning("Failed to load history: %s", exc)
+        logger.warning("Failed to load history from Supabase: %s", exc)
         return {"history": []}
