@@ -27,3 +27,15 @@ async def get_history(user_id: str = Depends(get_current_user)):
     except Exception as exc:
         logger.warning("Failed to load history from Supabase: %s", exc)
         return {"history": []}
+
+@router.delete("/history")
+async def delete_history(user_id: str = Depends(get_current_user)):
+    """Delete all scan history for the authenticated user from Supabase."""
+    try:
+        supabase = get_supabase()
+        # Since scan_reports has ON DELETE CASCADE referencing scan_history, deleting from scan_history removes the reports too.
+        supabase.table("scan_history").delete().eq("user_id", user_id).execute()
+        return {"status": "success"}
+    except Exception as exc:
+        logger.error("Failed to delete history: %s", exc)
+        return {"status": "error", "message": str(exc)}

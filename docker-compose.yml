@@ -6,6 +6,8 @@ services:
       - "8000:8000"
     volumes:
       - scan_data:/app/data
+    env_file:
+      - .env
     environment:
       - SECUREDEPLOY_OLLAMA_URL=http://ollama:11434
       - SECUREDEPLOY_OLLAMA_MODEL=mistral

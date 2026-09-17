@@ -305,9 +305,12 @@
 
         <!-- TAB: History -->
         <section class="tab-panel" id="panel-history">
-            <div class="panel-header">
-                <h2 class="panel-header__title">Scan History</h2>
-                <p class="panel-header__desc">Recent security scans</p>
+            <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h2 class="panel-header__title">Scan History</h2>
+                    <p class="panel-header__desc">Recent security scans</p>
+                </div>
+                <button class="btn btn--danger" id="btn-clear-history" style="display: none; padding: 6px 12px; font-size: 0.85rem;">Clear All History</button>
             </div>
 
             <div class="history-list" id="history-list">

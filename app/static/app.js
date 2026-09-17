@@ -537,15 +537,32 @@
     // ========================================================================
     // Downloads
     // ========================================================================
+    async function downloadWithAuth(url, filename) {
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error('Download failed');
+            const blob = await resp.blob();
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        } catch (err) {
+            console.error(err);
+            alert('Failed to download report.');
+        }
+    }
+
     $('#download-md-btn').addEventListener('click', () => {
         if (currentScanId) {
-            window.open(`/api/scan/${currentScanId}/report/markdown`, '_blank');
+            downloadWithAuth(`/api/scan/${currentScanId}/report/markdown`, `scan_report_${currentScanId}.md`);
         }
     });
 
     $('#download-json-btn').addEventListener('click', () => {
         if (currentScanId) {
-            window.open(`/api/scan/${currentScanId}/report/json`, '_blank');
+            downloadWithAuth(`/api/scan/${currentScanId}/report/json`, `scan_report_${currentScanId}.json`);
         }
     });
 
@@ -564,41 +581,79 @@
             const data = await resp.json();
             const list = $('#history-list');
             const empty = $('#no-history');
+            const btnClear = $('#btn-clear-history');
 
             if (!data.history || data.history.length === 0) {
                 list.innerHTML = '';
                 empty.classList.remove('hidden');
+                btnClear.style.display = 'none';
                 return;
             }
 
             empty.classList.add('hidden');
-            list.innerHTML = data.history
-                .map((h) => {
-                    const statusClass = h.status === 'complete' ? 'complete' : 'failed';
-                    const date = h.started_at
-                        ? new Date(h.started_at).toLocaleString()
-                        : 'Unknown';
+            btnClear.style.display = 'block';
+            
+            list.innerHTML = '';
+            data.history.forEach((h) => {
+                const statusClass = h.status === 'complete' ? 'complete' : 'failed';
+                const date = h.started_at ? new Date(h.started_at).toLocaleString() : 'Unknown';
+                
+                const div = document.createElement('div');
+                div.className = 'history-item';
+                div.innerHTML = `
+                    <div class="history-item__info">
+                        <div class="history-item__source">${escapeHtml(h.source_value)}</div>
+                        <div class="history-item__date">${escapeHtml(date)} · ${escapeHtml(h.source_type)}</div>
+                        ${h.status === 'complete' ? `
+                            <div style="margin-top: 8px; display: flex; gap: 8px;">
+                                <button class="btn btn--outline btn-hist-md" data-id="${h.id}" style="padding: 4px 8px; font-size: 0.75rem;">📄 MD</button>
+                                <button class="btn btn--outline btn-hist-json" data-id="${h.id}" style="padding: 4px 8px; font-size: 0.75rem;">{} JSON</button>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div class="history-item__stats">
+                        <span class="history-item__count history-item__count--total">${h.total_findings} findings</span>
+                        ${h.critical > 0 ? `<span class="history-item__count history-item__count--critical">${h.critical} critical</span>` : ''}
+                        ${h.high > 0 ? `<span class="history-item__count history-item__count--high">${h.high} high</span>` : ''}
+                        <span class="status-badge status-badge--${statusClass}">${h.status}</span>
+                    </div>
+                `;
+                
+                list.appendChild(div);
+            });
+            
+            $$('.btn-hist-md').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = e.target.dataset.id;
+                    downloadWithAuth(`/api/scan/${id}/report/markdown`, `scan_report_${id}.md`);
+                });
+            });
+            
+            $$('.btn-hist-json').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = e.target.dataset.id;
+                    downloadWithAuth(`/api/scan/${id}/report/json`, `scan_report_${id}.json`);
+                });
+            });
 
-                    return `
-                        <div class="history-item">
-                            <div class="history-item__info">
-                                <div class="history-item__source">${escapeHtml(h.source_value)}</div>
-                                <div class="history-item__date">${escapeHtml(date)} · ${escapeHtml(h.source_type)}</div>
-                            </div>
-                            <div class="history-item__stats">
-                                <span class="history-item__count history-item__count--total">${h.total_findings} findings</span>
-                                ${h.critical > 0 ? `<span class="history-item__count history-item__count--critical">${h.critical} critical</span>` : ''}
-                                ${h.high > 0 ? `<span class="history-item__count history-item__count--high">${h.high} high</span>` : ''}
-                                <span class="status-badge status-badge--${statusClass}">${h.status}</span>
-                            </div>
-                        </div>
-                    `;
-                })
-                .join('');
         } catch (err) {
             console.error('Failed to load history:', err);
         }
     }
+
+    $('#btn-clear-history').addEventListener('click', async () => {
+        if (!confirm('Are you sure you want to permanently delete all your scan history?')) return;
+        try {
+            const resp = await fetch('/api/history', { method: 'DELETE' });
+            if (resp.ok) {
+                loadHistory();
+            } else {
+                alert('Failed to clear history');
+            }
+        } catch(err) {
+            console.error(err);
+        }
+    });
 
     // ========================================================================
     // Utilities
