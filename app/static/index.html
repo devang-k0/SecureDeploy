@@ -67,19 +67,16 @@
         </div>
         <nav class="header__nav" id="main-nav">
             <button class="nav-btn active" data-tab="submit" id="nav-submit">
-                <span class="nav-btn__icon">⬆</span> New Scan
+                <span class="nav-btn__icon"></span> New Scan
             </button>
             <button class="nav-btn" data-tab="progress" id="nav-progress" style="display:none;">
-                <span class="nav-btn__icon">⏳</span> Progress
+                <span class="nav-btn__icon"></span> Progress
             </button>
             <button class="nav-btn" data-tab="results" id="nav-results" style="display:none;">
-                <span class="nav-btn__icon">📊</span> Results
-            </button>
-            <button class="nav-btn" data-tab="history" id="nav-history">
-                <span class="nav-btn__icon">🕐</span> History
+                <span class="nav-btn__icon"></span> Results
             </button>
             <button class="nav-btn" id="btn-logout" style="display: none;">
-                <span class="nav-btn__icon">🚪</span> Logout
+                <span class="nav-btn__icon"></span> Logout
             </button>
         </nav>
     </header>
@@ -88,7 +85,7 @@
     <main class="main">
 
         <!-- TAB: Submit a Scan -->
-        <section class="tab-panel active" id="panel-submit">
+        <section class="tab-panel active reveal" id="panel-submit">
             <div class="panel-header">
                 <h2 class="panel-header__title">Start a Security Scan</h2>
                 <p class="panel-header__desc">Analyze a code repository for vulnerabilities, risky dependencies, and hardcoded secrets.</p>
@@ -96,16 +93,12 @@
 
             <div class="source-tabs" id="source-tabs">
                 <button class="source-tab active" data-source="git_url" id="source-git">
-                    <span class="source-tab__icon">🌐</span>
+                    <span class="source-tab__icon"></span>
                     <span>Git URL</span>
                 </button>
                 <button class="source-tab" data-source="zip_upload" id="source-zip">
-                    <span class="source-tab__icon">📦</span>
+                    <span class="source-tab__icon"></span>
                     <span>Upload ZIP</span>
-                </button>
-                <button class="source-tab" data-source="local_path" id="source-local">
-                    <span class="source-tab__icon">📁</span>
-                    <span>Local Path</span>
                 </button>
             </div>
 
@@ -123,7 +116,7 @@
                 <label class="input-label">Upload ZIP Archive</label>
                 <div class="drop-zone" id="drop-zone">
                     <div class="drop-zone__content">
-                        <span class="drop-zone__icon">📁</span>
+                        <span class="drop-zone__icon"></span>
                         <p class="drop-zone__text">Drag & drop a ZIP file here</p>
                         <p class="drop-zone__hint">or click to browse</p>
                     </div>
@@ -132,49 +125,16 @@
                 <p class="file-name" id="selected-file-name"></p>
             </div>
 
-            <!-- Local path -->
-            <div class="input-area hidden" id="input-local_path">
-                <label class="input-label" for="local-path-input">Local Directory Path</label>
-                <div class="input-row">
-                    <input type="text" id="local-path-input" class="text-input" placeholder="/path/to/your/project" autocomplete="off">
-                </div>
-                <p class="input-hint">Path must be accessible from the server. Only works when running locally.</p>
-            </div>
-
             <button class="btn btn--primary btn--lg" id="start-scan-btn">
-                <span class="btn__icon">🛡️</span>
+                <span class="btn__icon"></span>
                 Start Security Scan
             </button>
 
             <div class="error-banner hidden" id="submit-error"></div>
-
-            <!-- Scanner info cards -->
-            <div class="scanner-cards">
-                <div class="scanner-card">
-                    <div class="scanner-card__icon">🔍</div>
-                    <h3 class="scanner-card__title">Code Patterns</h3>
-                    <p class="scanner-card__desc">Semgrep & Bandit scan for SQL injection, XSS, insecure crypto, and more.</p>
-                </div>
-                <div class="scanner-card">
-                    <div class="scanner-card__icon">📦</div>
-                    <h3 class="scanner-card__title">Dependencies</h3>
-                    <p class="scanner-card__desc">pip-audit checks for known vulnerabilities in your Python packages.</p>
-                </div>
-                <div class="scanner-card">
-                    <div class="scanner-card__icon">🔑</div>
-                    <h3 class="scanner-card__title">Secrets</h3>
-                    <p class="scanner-card__desc">Gitleaks detects hardcoded API keys, passwords, and tokens.</p>
-                </div>
-                <div class="scanner-card">
-                    <div class="scanner-card__icon">🤖</div>
-                    <h3 class="scanner-card__title">AI Triage</h3>
-                    <p class="scanner-card__desc">Optional Ollama-powered analysis prioritizes findings in plain language.</p>
-                </div>
-            </div>
         </section>
 
         <!-- TAB: Progress -->
-        <section class="tab-panel" id="panel-progress">
+        <section class="tab-panel reveal" id="panel-progress">
             <div class="panel-header">
                 <h2 class="panel-header__title">Scan in Progress</h2>
                 <p class="panel-header__desc" id="progress-scan-id"></p>
@@ -217,7 +177,7 @@
         </section>
 
         <!-- TAB: Results -->
-        <section class="tab-panel" id="panel-results">
+        <section class="tab-panel reveal" id="panel-results">
             <div class="panel-header panel-header--results">
                 <div>
                     <h2 class="panel-header__title">Scan Results</h2>
@@ -238,19 +198,19 @@
                     <div class="summary-card__value" id="summary-total">0</div>
                     <div class="summary-card__label">Total Findings</div>
                 </div>
-                <div class="summary-card summary-card--critical">
+                <div class="summary-card summary-card--critical reveal" style="animation-delay: 0.1s">
                     <div class="summary-card__value" id="summary-critical">0</div>
                     <div class="summary-card__label">Critical</div>
                 </div>
-                <div class="summary-card summary-card--high">
+                <div class="summary-card summary-card--high reveal" style="animation-delay: 0.2s">
                     <div class="summary-card__value" id="summary-high">0</div>
                     <div class="summary-card__label">High</div>
                 </div>
-                <div class="summary-card summary-card--medium">
+                <div class="summary-card summary-card--medium reveal" style="animation-delay: 0.3s">
                     <div class="summary-card__value" id="summary-medium">0</div>
                     <div class="summary-card__label">Medium</div>
                 </div>
-                <div class="summary-card summary-card--low">
+                <div class="summary-card summary-card--low reveal" style="animation-delay: 0.4s">
                     <div class="summary-card__value" id="summary-low">0</div>
                     <div class="summary-card__label">Low</div>
                 </div>
@@ -259,13 +219,10 @@
             <!-- Download buttons -->
             <div class="download-bar" id="download-bar">
                 <button class="btn btn--outline" id="download-md-btn">
-                    <span class="btn__icon">📄</span> Download Markdown
+                    <span class="btn__icon"></span> Download Markdown
                 </button>
                 <button class="btn btn--outline" id="download-json-btn">
-                    <span class="btn__icon">📋</span> Download JSON
-                </button>
-                <button class="btn btn--ghost" id="new-scan-btn">
-                    <span class="btn__icon">➕</span> New Scan
+                    <span class="btn__icon"></span> Download JSON
                 </button>
             </div>
 
@@ -285,9 +242,6 @@
                 <button class="filter-btn" data-filter="high" id="filter-high">High</button>
                 <button class="filter-btn" data-filter="medium" id="filter-medium">Medium</button>
                 <button class="filter-btn" data-filter="low" id="filter-low">Low</button>
-                <button class="filter-btn" data-filter="code_pattern" id="filter-code">Code</button>
-                <button class="filter-btn" data-filter="dependency" id="filter-dep">Deps</button>
-                <button class="filter-btn" data-filter="secret" id="filter-secret">Secrets</button>
             </div>
 
             <!-- Findings list -->
@@ -297,30 +251,9 @@
 
             <!-- No results state -->
             <div class="empty-state hidden" id="no-findings">
-                <div class="empty-state__icon">✅</div>
+                <div class="empty-state__icon"></div>
                 <h3 class="empty-state__title">No Security Issues Found</h3>
                 <p class="empty-state__desc">Great job! Your code passed all security checks.</p>
-            </div>
-        </section>
-
-        <!-- TAB: History -->
-        <section class="tab-panel" id="panel-history">
-            <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <h2 class="panel-header__title">Scan History</h2>
-                    <p class="panel-header__desc">Recent security scans</p>
-                </div>
-                <button class="btn btn--danger" id="btn-clear-history" style="display: none; padding: 6px 12px; font-size: 0.85rem;">Clear All History</button>
-            </div>
-
-            <div class="history-list" id="history-list">
-                <!-- Dynamically populated -->
-            </div>
-
-            <div class="empty-state hidden" id="no-history">
-                <div class="empty-state__icon">📭</div>
-                <h3 class="empty-state__title">No Scans Yet</h3>
-                <p class="empty-state__desc">Start your first scan to see history here.</p>
             </div>
         </section>
     </main>

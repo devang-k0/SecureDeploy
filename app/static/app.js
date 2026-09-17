@@ -44,14 +44,12 @@
         submit: $('#panel-submit'),
         progress: $('#panel-progress'),
         results: $('#panel-results'),
-        history: $('#panel-history'),
     };
 
     const navBtns = {
         submit: $('#nav-submit'),
         progress: $('#nav-progress'),
         results: $('#nav-results'),
-        history: $('#nav-history'),
     };
 
     // ========================================================================
@@ -67,11 +65,6 @@
         Object.entries(navBtns).forEach(([key, btn]) => {
             btn.classList.toggle('active', key === tabName);
         });
-
-        // Load history when switching to that tab
-        if (tabName === 'history') {
-            loadHistory();
-        }
     }
 
     $$('.nav-btn').forEach((btn) => {
@@ -373,6 +366,7 @@
 
             // Switch to results tab
             navBtns.results.style.display = '';
+            navBtns.progress.style.display = 'none';
             switchTab('results');
 
             // Render summary
@@ -431,24 +425,25 @@
         list.innerHTML = '';
 
         findings.forEach((f, idx) => {
-            const card = document.createElement('div');
-            card.className = 'finding-card';
-            card.dataset.severity = f.severity;
-            card.dataset.category = f.category;
-            card.style.animationDelay = `${idx * 0.03}s`;
+            const div = document.createElement('div');
+            div.className = 'finding-card reveal';
+            div.dataset.severity = f.severity;
+            div.dataset.category = f.category;
+            div.style.animationDelay = `${idx * 0.03}s`;
 
             const catLabel = {
                 code_pattern: 'Code',
                 dependency: 'Dependency',
                 secret: 'Secret',
+                ai: 'AI Analysis'
             }[f.category] || f.category;
 
-            card.innerHTML = `
+            div.innerHTML = `
                 <div class="finding-card__header">
                     <div class="finding-card__main">
                         <div class="finding-card__title">${escapeHtml(f.title)}</div>
                         <div class="finding-card__meta">
-                            <span>🔧 ${escapeHtml(f.scanner)}</span>
+                            <span>${escapeHtml(f.scanner)}</span>
                             ${f.cwe ? `<span>${escapeHtml(f.cwe)}</span>` : ''}
                         </div>
                     </div>
@@ -456,27 +451,27 @@
                         <span class="sev-badge sev-badge--${f.severity}">${f.severity}</span>
                         ${f.cvss_score !== null && f.cvss_score !== undefined ? `<span class="cvss-badge">CVSS ${f.cvss_score.toFixed(1)}</span>` : ''}
                         <span class="cat-badge">${catLabel}</span>
-                        ${f.attack_type ? `<span class="attack-badge">🛡️ ${escapeHtml(f.attack_type)}</span>` : ''}
+                        ${f.attack_type ? `<span class="attack-badge">${escapeHtml(f.attack_type)}</span>` : ''}
                         <span class="finding-card__chevron">▼</span>
                     </div>
                 </div>
                 <div class="finding-card__body">
                     ${f.file_path ? `
                     <div class="finding-card__location">
-                        <strong>📍 Location:</strong> <code>${escapeHtml(f.file_path)}${f.line_start ? ` : line ${f.line_start}` : ''}</code>
+                        <strong>Location:</strong> <code>${escapeHtml(f.file_path)}${f.line_start ? ` : line ${f.line_start}` : ''}</code>
                     </div>
                     ` : ''}
                     <p class="finding-card__desc">${escapeHtml(f.description)}</p>
                     ${f.risk_explanation ? `
                     <div class="finding-card__risk">
-                        <strong>⚠️ Why is this a risk?</strong>
+                        <strong>Why is this a risk?</strong>
                         <p>${escapeHtml(f.risk_explanation)}</p>
                     </div>
                     ` : ''}
                     ${f.code_snippet ? `<pre class="finding-card__code">${escapeHtml(f.code_snippet)}</pre>` : ''}
                     ${f.fix_suggestion ? `
                         <div class="finding-card__fix">
-                            <span class="finding-card__fix-icon">💡</span>
+                            <span class="finding-card__fix-icon"></span>
                             <span class="finding-card__fix-text">${escapeHtml(f.fix_suggestion)}</span>
                         </div>
                     ` : ''}
@@ -489,12 +484,16 @@
             `;
 
             // Toggle expand on header click
-            const header = card.querySelector('.finding-card__header');
+            const header = div.querySelector('.finding-card__header');
             header.addEventListener('click', () => {
-                card.classList.toggle('expanded');
+                div.classList.toggle('expanded');
             });
 
-            list.appendChild(card);
+            list.appendChild(div);
+            // Observe newly added finding card
+            if (window.scrollObserver) {
+                window.scrollObserver.observe(div);
+            }
         });
     }
 
@@ -566,97 +565,10 @@
         }
     });
 
-    $('#new-scan-btn').addEventListener('click', () => {
-        switchTab('submit');
-    });
+
 
     // ========================================================================
-    // History
-    // ========================================================================
-    async function loadHistory() {
-        try {
-            const resp = await fetch('/api/history');
-            if (!resp.ok) return;
-
-            const data = await resp.json();
-            const list = $('#history-list');
-            const empty = $('#no-history');
-            const btnClear = $('#btn-clear-history');
-
-            if (!data.history || data.history.length === 0) {
-                list.innerHTML = '';
-                empty.classList.remove('hidden');
-                btnClear.style.display = 'none';
-                return;
-            }
-
-            empty.classList.add('hidden');
-            btnClear.style.display = 'block';
-            
-            list.innerHTML = '';
-            data.history.forEach((h) => {
-                const statusClass = h.status === 'complete' ? 'complete' : 'failed';
-                const date = h.started_at ? new Date(h.started_at).toLocaleString() : 'Unknown';
-                
-                const div = document.createElement('div');
-                div.className = 'history-item';
-                div.innerHTML = `
-                    <div class="history-item__info">
-                        <div class="history-item__source">${escapeHtml(h.source_value)}</div>
-                        <div class="history-item__date">${escapeHtml(date)} · ${escapeHtml(h.source_type)}</div>
-                        ${h.status === 'complete' ? `
-                            <div style="margin-top: 8px; display: flex; gap: 8px;">
-                                <button class="btn btn--outline btn-hist-md" data-id="${h.id}" style="padding: 4px 8px; font-size: 0.75rem;">📄 MD</button>
-                                <button class="btn btn--outline btn-hist-json" data-id="${h.id}" style="padding: 4px 8px; font-size: 0.75rem;">{} JSON</button>
-                            </div>
-                        ` : ''}
-                    </div>
-                    <div class="history-item__stats">
-                        <span class="history-item__count history-item__count--total">${h.total_findings} findings</span>
-                        ${h.critical > 0 ? `<span class="history-item__count history-item__count--critical">${h.critical} critical</span>` : ''}
-                        ${h.high > 0 ? `<span class="history-item__count history-item__count--high">${h.high} high</span>` : ''}
-                        <span class="status-badge status-badge--${statusClass}">${h.status}</span>
-                    </div>
-                `;
-                
-                list.appendChild(div);
-            });
-            
-            $$('.btn-hist-md').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const id = e.target.dataset.id;
-                    downloadWithAuth(`/api/scan/${id}/report/markdown`, `scan_report_${id}.md`);
-                });
-            });
-            
-            $$('.btn-hist-json').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const id = e.target.dataset.id;
-                    downloadWithAuth(`/api/scan/${id}/report/json`, `scan_report_${id}.json`);
-                });
-            });
-
-        } catch (err) {
-            console.error('Failed to load history:', err);
-        }
-    }
-
-    $('#btn-clear-history').addEventListener('click', async () => {
-        if (!confirm('Are you sure you want to permanently delete all your scan history?')) return;
-        try {
-            const resp = await fetch('/api/history', { method: 'DELETE' });
-            if (resp.ok) {
-                loadHistory();
-            } else {
-                alert('Failed to clear history');
-            }
-        } catch(err) {
-            console.error(err);
-        }
-    });
-
-    // ========================================================================
-    // Utilities
+    // Init
     // ========================================================================
     function escapeHtml(str) {
         if (!str) return '';
@@ -668,8 +580,27 @@
     // ========================================================================
     // Init
     // ========================================================================
+    function initScrollAnimations() {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target); // only animate once
+                }
+            });
+        }, {
+            threshold: 0.1,
+            rootMargin: "0px 0px -20px 0px"
+        });
+        
+        window.scrollObserver = observer;
+
+        $$('.reveal').forEach(el => observer.observe(el));
+    }
+
     initAuth().then(() => {
         switchTab('submit');
+        initScrollAnimations();
     });
 
 })();
